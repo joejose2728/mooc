@@ -271,10 +271,17 @@ public class Server {
 
 		// establish nearest nodes and start receiving heartbeats
 		heartbeatMgr = HeartbeatManager.getInstance(myId);
-		for (NodeDesc nn : conf.getNearest().getNearestNodes().values()) {
+		
+		//TEAM code: set nearest nodes
+		heartbeatMgr.initNetwork(conf.getNearest());
+		
+		//below commented code moved to initNetwork method of HeartbeatManager
+		/*for (NodeDesc nn : conf.getNearest().getNearestNodes().values()) {
 			HeartbeatData node = new HeartbeatData(nn.getNodeId(), nn.getHost(), nn.getPort(), nn.getMgmtPort());
 			HeartbeatConnector.getInstance().addConnectToThisNode(node);
-		}
+		}*/
+		
+		
 		heartbeatMgr.start();
 
 		// manage heartbeatMgr connections
@@ -297,12 +304,9 @@ public class Server {
 			logger.info("Declaring election -" + myId);
 			electionMgr.declareElection();
 		}*/
-		
-		ElectionInitializer ei = new ElectionInitializer();
-		ei.start();
 	}
 
-	class ElectionInitializer extends Thread {
+	/*class ElectionInitializer extends Thread {
 
 		public void run() {
 			try {
@@ -317,7 +321,7 @@ public class Server {
 				electionMgr.declareElection();
 			}
 		}
-	}
+	}*/
 	/**
 	 * 
 	 */

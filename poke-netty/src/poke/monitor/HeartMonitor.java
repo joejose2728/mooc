@@ -30,8 +30,8 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import poke.server.management.managers.ElectionManager;
 import poke.server.management.managers.NetworkChannelMap;
-
 import eye.Comm.Management;
 import eye.Comm.Network;
 import eye.Comm.Network.NetworkAction;
@@ -213,6 +213,10 @@ public class HeartMonitor {
 		return rtn;
 	}
 
+	public String getWhoAmI(){
+		return whoami;
+	}
+	
 	public String getHost() {
 		return host;
 	}
@@ -267,9 +271,12 @@ public class HeartMonitor {
 
 		@Override
 		public void operationComplete(ChannelFuture future) throws Exception {
+			String node = monitor.getWhoAmI();
 			monitor.release();
 			// clear the channel entry from network channel map
-			NetworkChannelMap.getInstance().remove(monitor.getHost());
+			NetworkChannelMap ncm = NetworkChannelMap.getInstance();
+			ncm.remove(node);
+			ElectionManager.getInstance().notifyNodeLeave(node, ncm.size());
 		}
 	}
 }

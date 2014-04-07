@@ -22,7 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import poke.monitor.HeartMonitor;
-import poke.monitor.MonitorHandler;
+import poke.server.management.managers.ElectionManager.NodeStatus;
 import poke.server.management.managers.HeartbeatData.BeatStatus;
 
 /**
@@ -40,7 +40,7 @@ public class HeartbeatConnector extends Thread {
 	private ConcurrentLinkedQueue<HeartMonitor> monitors = new ConcurrentLinkedQueue<HeartMonitor>();
 	private int sConnectRate = 2000; // msec
 	private boolean forever = true;
-
+	
 	public static HeartbeatConnector getInstance() {
 		instance.compareAndSet(null, new HeartbeatConnector());
 		return instance.get();
@@ -93,8 +93,15 @@ public class HeartbeatConnector extends Thread {
 						} catch (Exception ie) {
 							// do nothing
 						}
-					} else {
-						NetworkChannelMap.getInstance().put(hb.getHost(), hb.getChannel());
+					} else { // TEAM Code: add channel to hashmap for reuse
+						NetworkChannelMap ncm = NetworkChannelMap.getInstance();
+						if (!ncm.contains(hb.getHost())){
+						  ncm.put(hb.getWhoAmI(), hb.getChannel());
+						  //notify election manager that one or more nodes has joined
+						  ElectionManager electionManager = ElectionManager.getInstance();
+						  if (electionManager.getNodeStatus() != NodeStatus.Cluster) 
+							  electionManager.changeNodeStatus(NodeStatus.Cluster);
+						}
 					}
 				}
 			} catch (InterruptedException e) {

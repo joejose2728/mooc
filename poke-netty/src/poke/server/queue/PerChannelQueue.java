@@ -184,7 +184,7 @@ public class PerChannelQueue implements ChannelQueue {
 					if (conn.isWritable()) {
 						boolean rtn = false;
 						if (channel != null && channel.isOpen() && channel.isWritable()) {
-							ChannelFuture cf = channel.write(msg);
+							ChannelFuture cf = channel.writeAndFlush(msg);
 
 							// blocks on write - use listener to be async
 							cf.awaitUninterruptibly();

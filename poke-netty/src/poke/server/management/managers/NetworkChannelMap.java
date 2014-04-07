@@ -2,6 +2,7 @@ package poke.server.management.managers;
 
 import io.netty.channel.Channel;
 
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -41,5 +42,17 @@ public class NetworkChannelMap {
 	
 	public void remove(String node){
 		adjacentChannels.remove(node);
+	}
+	
+	public boolean contains(String node){
+		return adjacentChannels.contains(node);
+	}
+
+	public int size() {
+		return adjacentChannels.size();
+	}
+	
+	public Set<String> keySet(){
+		return adjacentChannels.keySet();
 	}
 }

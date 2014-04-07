@@ -17346,6 +17346,14 @@ public final class Comm {
        * <code>DECLAREVOID = 5;</code>
        */
       DECLAREVOID(4, 5),
+      /**
+       * <code>LEADER = 6;</code>
+       */
+      LEADER(5, 6),
+      /**
+       * <code>LEADERRESPONSE = 7;</code>
+       */
+      LEADERRESPONSE(6, 7),
       ;
 
       /**
@@ -17368,6 +17376,14 @@ public final class Comm {
        * <code>DECLAREVOID = 5;</code>
        */
       public static final int DECLAREVOID_VALUE = 5;
+      /**
+       * <code>LEADER = 6;</code>
+       */
+      public static final int LEADER_VALUE = 6;
+      /**
+       * <code>LEADERRESPONSE = 7;</code>
+       */
+      public static final int LEADERRESPONSE_VALUE = 7;
 
 
       public final int getNumber() { return value; }
@@ -17379,6 +17395,8 @@ public final class Comm {
           case 3: return ABSTAIN;
           case 4: return DECLAREWINNER;
           case 5: return DECLAREVOID;
+          case 6: return LEADER;
+          case 7: return LEADERRESPONSE;
           default: return null;
         }
       }
@@ -19963,20 +19981,21 @@ public final class Comm {
       "work.NetworkAction\"f\n\rNetworkAction\022\014\n\010N" +
       "ODEJOIN\020\001\022\r\n\tNODELEAVE\020\002\022\014\n\010NODEDEAD\020\003\022\r" +
       "\n\tCREATEMAP\0207\022\014\n\010ANNOUNCE\0208\022\r\n\010SHUTDOWN\020" +
-      "\347\007\"\330\001\n\016LeaderElection\022\017\n\007node_id\030\001 \002(\t\022\021" +
+      "\347\007\"\370\001\n\016LeaderElection\022\017\n\007node_id\030\001 \002(\t\022\021" +
       "\n\tballot_id\030\002 \002(\t\022\014\n\004desc\030\004 \002(\t\022(\n\004vote\030" +
       "\005 \002(\0162\032.LeaderElection.VoteAction\022\017\n\007exp" +
-      "ires\030\006 \001(\003\"Y\n\nVoteAction\022\014\n\010ELECTION\020\001\022\014" +
+      "ires\030\006 \001(\003\"y\n\nVoteAction\022\014\n\010ELECTION\020\001\022\014" +
       "\n\010NOMINATE\020\002\022\013\n\007ABSTAIN\020\003\022\021\n\rDECLAREWINN" +
-      "ER\020\004\022\017\n\013DECLAREVOID\020\005\"\237\001\n\nManagement\022\027\n\005",
-      "graph\030\001 \001(\0132\010.Network\022\030\n\004beat\030\002 \001(\0132\n.He" +
-      "artbeat\022!\n\010election\030\003 \001(\0132\017.LeaderElecti" +
-      "on\022!\n\013job_propose\030\004 \001(\0132\014.JobProposal\022\030\n" +
-      "\007job_bid\030\005 \001(\0132\007.JobBid*\221\001\n\nPokeStatus\022\n" +
-      "\n\006UKNOWN\020\001\022\013\n\007SUCCESS\020\002\022\013\n\007NOFOUND\020d\022\020\n\014" +
-      "NOINCOMPLETE\020e\022\n\n\006NOAUTH\020f\022\020\n\014NOCONNECTI" +
-      "ON\020g\022\017\n\013NOREACHABLE\020h\022\016\n\nNORESOURCE\020i\022\014\n" +
-      "\007FAILURE\020\307\001B\007\n\003eyeH\001"
+      "ER\020\004\022\017\n\013DECLAREVOID\020\005\022\n\n\006LEADER\020\006\022\022\n\016LEA",
+      "DERRESPONSE\020\007\"\237\001\n\nManagement\022\027\n\005graph\030\001 " +
+      "\001(\0132\010.Network\022\030\n\004beat\030\002 \001(\0132\n.Heartbeat\022" +
+      "!\n\010election\030\003 \001(\0132\017.LeaderElection\022!\n\013jo" +
+      "b_propose\030\004 \001(\0132\014.JobProposal\022\030\n\007job_bid" +
+      "\030\005 \001(\0132\007.JobBid*\221\001\n\nPokeStatus\022\n\n\006UKNOWN" +
+      "\020\001\022\013\n\007SUCCESS\020\002\022\013\n\007NOFOUND\020d\022\020\n\014NOINCOMP" +
+      "LETE\020e\022\n\n\006NOAUTH\020f\022\020\n\014NOCONNECTION\020g\022\017\n\013" +
+      "NOREACHABLE\020h\022\016\n\nNORESOURCE\020i\022\014\n\007FAILURE" +
+      "\020\307\001B\007\n\003eyeH\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {

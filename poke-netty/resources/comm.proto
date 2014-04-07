@@ -241,6 +241,7 @@ message LeaderElection {
       ABSTAIN = 3;
       DECLAREWINNER = 4;
       DECLAREVOID = 5;
+      LEADER = 6;
    }
 }
 

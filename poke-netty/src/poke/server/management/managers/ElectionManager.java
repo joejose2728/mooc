@@ -24,9 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import poke.server.conf.NodeDesc;
-import poke.server.election.Election;
 import poke.server.election.ElectionData;
-import poke.server.election.LCR;
 
 import com.google.protobuf.GeneratedMessage;
 
@@ -44,16 +42,19 @@ public class ElectionManager {
 	protected static Logger logger = LoggerFactory.getLogger("management");
 	protected static AtomicReference<ElectionManager> instance = new AtomicReference<ElectionManager>();
 
-	public enum ElectionStatus { Unkown, Election, Announced};
+	public enum ElectionStatus { Unkown, Election, Nominated, Announced};
+	public enum NodeStatus {Single, Cluster};
 
 	private String nodeId;
+	private String ballotId;
 	private ElectionStatus electionStatus;
-	private Election election;
 	private String leaderNode;
+	private NodeStatus nodeStatus;
 	private TreeMap<String,NodeDesc> nearestNodes;
 
 	/** @brief the number of votes this server can cast */
 	private int votes = 1;
+
 
 	public static ElectionManager getInstance(String id, int votes) {
 		instance.compareAndSet(null, new ElectionManager(id, votes));
@@ -72,12 +73,18 @@ public class ElectionManager {
 	 */
 	protected ElectionManager(String nodeId, int votes) {
 		this.nodeId = nodeId;
-		this.election = new LCR(nodeId);
+		this.ballotId = nodeId + "_ballot"; 
 		this.electionStatus = ElectionStatus.Unkown;
 		if (votes >= 0)
 			this.votes = votes;
+		this.nodeStatus = NodeStatus.Single; // when starts up default is single
+		startElectionInitiator();
 	}
 
+	private void startElectionInitiator(){
+		ElectionInitiator initiator = new ElectionInitiator();
+		initiator.start();
+	}
 	/**
 	 * @param args
 	 */
@@ -94,23 +101,14 @@ public class ElectionManager {
 		}
 
 		GeneratedMessage msg = null;
-		ElectionData electionData = null;
 
 		if (req.getVote().getNumber() == VoteAction.ELECTION_VALUE) {
 			// an election is declared!
+			if (electionStatus == ElectionStatus.Election)
+				return;
 
-			if (electionStatus != ElectionStatus.Election) {
-				logger.info("Election declared - " + req.getNodeId());
-				electionStatus = ElectionStatus.Election;
-				msg = forward(req);
-			}
-			else {
-				//election initiator has received back the declare election message 
-				// now nominate my self
-				logger.info("Election status - election. Nominating myself - " + req.getNodeId());
-				electionData = election.nominate();
-				msg = generateElectionMsg(electionData.getVoteAction(), electionData.getNode());
-			}
+			logger.info("Election declared by node - " + req.getNodeId());
+			electionStatus = ElectionStatus.Election;
 
 		} else if (req.getVote().getNumber() == VoteAction.DECLAREVOID_VALUE) {
 			// no one was elected, I am dropping into standby mode`
@@ -121,33 +119,70 @@ public class ElectionManager {
 				electionStatus = ElectionStatus.Announced;
 				leaderNode = req.getNodeId();
 				logger.info("Winner elected - " + req.getNodeId());
-				
-				//forward that leader is elected to adjacent nodes
-				msg = forward(req);
-				logger.info("Forwarding winner to my neighbors - " + req.getNodeId());
 			}
 
 		} else if (req.getVote().getNumber() == VoteAction.ABSTAIN_VALUE) {
 			// for some reason, I decline to vote
 		} else if (req.getVote().getNumber() == VoteAction.NOMINATE_VALUE) {
-			electionData = election.nominate(req.getNodeId());
-			msg = generateElectionMsg(electionData.getVoteAction(), electionData.getNode());
-			
-			logger.info("Nominating me|requester  - " + electionData.getNode());
-			//if this nomination results in leader then change election status
-			if (electionData.getVoteAction() == VoteAction.DECLAREWINNER) {
-				electionStatus = ElectionStatus.Announced;
-				leaderNode = nodeId;
-				logger.info("I am the winner - " + nodeId);
+				if (electionStatus == ElectionStatus.Election) {
+				nominateSelfToHigherNodes();
+			}
+
+		} else if (req.getVote().getNumber() == VoteAction.LEADER_VALUE){
+			logger.info("Leader request from - " + req.getNodeId());
+			// request for current leader. reply if you know
+			if (electionStatus ==
+					ElectionStatus.Announced && leaderNode != null){
+				NetworkChannelMap ncm = NetworkChannelMap.getInstance();
+				msg = generateElectionMsg(new ElectionData(VoteAction.LEADERRESPONSE, leaderNode), "","");
+
+				Channel requestedChannel = ncm.get(req.getNodeId());
+				if (requestedChannel != null)
+					requestedChannel.writeAndFlush(msg);
+
+				return;
+			}
+		} else if (req.getVote().getNumber() == VoteAction.LEADERRESPONSE_VALUE){
+			leaderNode = req.getNodeId();
+			electionStatus = ElectionStatus.Announced;
+		}
+	}
+
+    void nominateSelfToHigherNodes() {
+		GeneratedMessage msg = generateElectionMsg(new ElectionData(VoteAction.NOMINATE, nodeId), ballotId, nodeId);
+		NetworkChannelMap channels = NetworkChannelMap.getInstance();
+		int k = 0;
+
+		for (String node : channels.keySet()){
+			int compareTo = node.compareTo(nodeId);
+			if (compareTo == 1) {
+				Channel ch = channels.get(node);
+				if (ch != null)
+					ch.writeAndFlush(msg);
+				k++;
+			} else if (compareTo == -1) {
+				//bully
 			}
 		}
-		
-		if (msg != null)
-		  transmit(msg);
+
+		if (k==0 && channels.size() > 0) { //all nodes are lower than me
+			declareSelfAsWinner();
+		}
 	}
 
 	public ElectionStatus getElectionStatus() {
 		return electionStatus;
+	}
+	/**
+	 * Change this server's status to single or cluster
+	 * @param nodeStatus
+	 */
+	public void changeNodeStatus(NodeStatus nodeStatus){
+		this.nodeStatus = nodeStatus;
+	}
+
+	public NodeStatus getNodeStatus(){
+		return nodeStatus;
 	}
 
 	public String getLeaderNode() {
@@ -158,12 +193,22 @@ public class ElectionManager {
 		this.nearestNodes = nearestNodes;
 	}
 
-	private void transmit(GeneratedMessage msg){
+	/**
+	 * Transmit the message to all nearest nodes except the requester
+	 * @param msg
+	 * @param req
+	 */
+	private void transmit(GeneratedMessage msg, LeaderElection req){
 		NetworkChannelMap channels = NetworkChannelMap.getInstance();
 		for (NodeDesc node: nearestNodes.values()){
-			logger.info("Near me - " + node.getHost() +", Me - " + nodeId);
-			Channel ch = channels.get(node.getHost());
-			ch.writeAndFlush(msg);
+			//no point in transmitting to the requested node in complete undirected graph
+			if (req != null && req.getNodeId().equals(node.getNodeId())) 
+				continue; 
+
+			//logger.info("Transmitting election message to " + node.getNodeId());
+			Channel ch = channels.get(node.getNodeId());
+			if (ch != null)
+				ch.writeAndFlush(msg);
 		}
 	}
 
@@ -171,20 +216,18 @@ public class ElectionManager {
 		return electionStatus == ElectionStatus.Announced && leaderNode != null; 
 	}
 
-	public void declareElection(){
-		GeneratedMessage msg = generateElectionMsg(VoteAction.ELECTION, nodeId);
-		transmit(msg);
+	void declareElection(){
+		electionStatus = ElectionStatus.Election;
+		GeneratedMessage msg = generateElectionMsg(new ElectionData(VoteAction.ELECTION, nodeId), ballotId, nodeId);
+		transmit(msg, null);
 	}
 
-	String ballotId = "cluster_5";
-	String desc = "desc";
-	
-	private Management generateElectionMsg(VoteAction voteAction, String node){
+	private Management generateElectionMsg(ElectionData election, String ballotId, String desc){
 		LeaderElection.Builder leader = LeaderElection.newBuilder();
 		leader.setBallotId(ballotId);
 		leader.setDesc(desc);
-		leader.setNodeId(node);
-		leader.setVote(voteAction);
+		leader.setNodeId(election.getNode());
+		leader.setVote(election.getVoteAction());
 		return forward(leader.build());
 	}
 
@@ -192,5 +235,36 @@ public class ElectionManager {
 		Management.Builder builder = Management.newBuilder();
 		builder.setElection(req);
 		return builder.build();
+	}
+
+	void broadcastForLeader() {
+		GeneratedMessage msg = generateElectionMsg(new ElectionData(VoteAction.LEADER, nodeId), "", "");
+		transmit(msg, null);
+	}
+
+	void declareSelfAsWinner() {
+		electionStatus = ElectionStatus.Announced;
+		leaderNode = nodeId;
+		GeneratedMessage msg = generateElectionMsg(new ElectionData(VoteAction.DECLAREWINNER, nodeId), "", "");
+		NetworkChannelMap channels = NetworkChannelMap.getInstance();
+
+		for (String node: channels.keySet()){
+			Channel ch = channels.get(node);
+			if (ch != null)
+				ch.writeAndFlush(msg);
+		}
+	}
+
+	public void notifyNodeLeave(String node, int size) {
+		if (size == 0){
+			nodeStatus = NodeStatus.Single;
+		}
+
+		// Leader is down. Doom coming. Start election initiator.
+		if (node.equals(leaderNode)){
+			leaderNode = null;
+			electionStatus = ElectionStatus.Unkown;
+			startElectionInitiator();
+		}
 	}
 }

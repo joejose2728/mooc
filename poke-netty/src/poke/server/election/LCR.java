@@ -15,11 +15,14 @@ public class LCR implements Election {
 	}
 
 	public ElectionData nominate(String requestNode) {
+		/*Integer reqNode = Integer.parseInt(requestNode);
+		Integer self = Integer.parseInt(nodeId);*/
+		
 		int compareTo = requestNode.compareTo(nodeId);
-		if (compareTo == -1){
+		if (compareTo == 1){
 			//requested node has higher priority.
 			return new ElectionData(VoteAction.NOMINATE, requestNode);
-		}  else if (compareTo == 1){
+		}  else if (compareTo == -1){
 			//I have higher priority. Nominate myself
 			return nominate();
 		} else {

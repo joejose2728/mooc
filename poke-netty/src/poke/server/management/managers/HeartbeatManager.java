@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import poke.server.conf.NodeDesc;
 import poke.server.conf.ServerConf.NearestConf;
 import poke.server.management.ManagementQueue;
 import poke.server.management.managers.HeartbeatData.BeatStatus;
@@ -87,6 +88,10 @@ public class HeartbeatManager extends Thread {
 	 * @param edges
 	 */
 	public void initNetwork(NearestConf edges) {
+		for (NodeDesc nn : edges.getNearestNodes().values()) {
+			HeartbeatData node = new HeartbeatData(nn.getNodeId(), nn.getHost(), nn.getPort(), nn.getMgmtPort());
+			HeartbeatConnector.getInstance().addConnectToThisNode(node);
+		}
 	}
 
 	/**
